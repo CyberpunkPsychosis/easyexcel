@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: { assetId: st
     const user = await requireUser();
     const asset = await prisma.asset.findUnique({ where: { id: params.assetId } });
     if (!asset || !asset.storageKey) notFound('资产不存在');
-    await assertProjectAccess(asset.projectId, user.id);
+    await assertProjectAccess(asset.projectId, user.id, 'read');
 
     const storage = getStorage();
     const presigned = await storage.presignedUrl(asset.storageKey);

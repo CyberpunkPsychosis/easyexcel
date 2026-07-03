@@ -13,6 +13,8 @@ const schema = z.object({
   script: z.string().min(10).max(100_000),
   adapterId: z.string().optional(),
   guidance: z.string().max(2000).optional(),
+  /** 模板市场：套用爆款结构模板（guidance 注入分镜提示词） */
+  templateId: z.string().optional(),
 });
 
 /** 剧本 → 分镜表（异步任务；LLM 适配器可任选，见 registry?capability=text.storyboard） */
@@ -25,9 +27,22 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
     const adapterId = body.adapterId ?? (await resolveAdapterId(params.projectId, 'text.storyboard'));
     const adapter = getAdapter(adapterId);
     const characters = await prisma.character.findMany({ where: { projectId: params.projectId } });
+
+    let guidance = body.guidance ?? '';
+    if (body.templateId) {
+      const template = await prisma.template.findUnique({ where: { id: body.templateId } });
+      if (template) {
+        guidance = [template.guidance, guidance].filter(Boolean).join('\n');
+        await prisma.template.update({
+          where: { id: template.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+    }
+
     const input = {
       script: body.script,
-      guidance: body.guidance,
+      guidance,
       characterNames: characters.map((c) => c.name),
     };
     const estimated = adapter.estimateCost(input);

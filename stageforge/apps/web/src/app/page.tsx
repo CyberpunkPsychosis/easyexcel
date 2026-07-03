@@ -17,7 +17,8 @@ export default async function DashboardPage() {
 
   const [projects, totals] = await Promise.all([
     prisma.project.findMany({
-      where: { ownerId: userId },
+      // 自己的 + 被邀请协作的
+      where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
       orderBy: { updatedAt: 'desc' },
       include: { _count: { select: { episodes: true, characters: true } } },
     }),
@@ -29,6 +30,11 @@ export default async function DashboardPage() {
   ]);
 
   const storyboardAdapters = listAdapters('text.storyboard').map(serializeAdapter);
+  const templates = await prisma.template.findMany({
+    where: { OR: [{ builtIn: true }, { authorId: userId }] },
+    orderBy: [{ builtIn: 'desc' }, { usedCount: 'desc' }],
+    select: { id: true, name: true, genre: true, description: true },
+  });
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -62,7 +68,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="mt-8">
-        <NewProjectForm storyboardAdapters={storyboardAdapters} />
+        <NewProjectForm storyboardAdapters={storyboardAdapters} templates={templates} />
       </section>
 
       <section className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

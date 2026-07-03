@@ -8,29 +8,62 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
+  id           String          @id @default(cuid())
+  email        String          @unique
   name         String?
   passwordHash String
-  createdAt    DateTime       @default(now())
+  createdAt    DateTime        @default(now())
   projects     Project[]
+  memberships  ProjectMember[]
+  templates    Template[]
   ledger       CreditLedger[]
 }
 
 model Project {
-  id           String         @id @default(cuid())
-  name         String
-  description  String?
-  ownerId      String
-  owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  episodes     Episode[]
-  characters   Character[]
-  modelConfigs ModelConfig[]
-  assets       Asset[]
-  jobs         GenerationJob[]
-  ledger       CreditLedger[]
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  ownerId        String
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// 广电备案号（未备案 AI 短剧 2026-04 起下架 —— 合规卡点校验项）
+  registrationNo String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  episodes       Episode[]
+  characters     Character[]
+  modelConfigs   ModelConfig[]
+  assets         Asset[]
+  jobs           GenerationJob[]
+  members        ProjectMember[]
+  ledger         CreditLedger[]
+}
+
+/// 团队协作：editor 可生成/改剧本，viewer 只读
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("editor") // editor | viewer
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+}
+
+/// 模板市场：内置爆款结构 + 用户自建，分镜生成时作为 guidance 注入 LLM
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  genre       String   @default("")
+  /// 节拍/钩子公式等结构化指导（拼进分镜提示词）
+  guidance    String
+  builtIn     Boolean  @default(false)
+  authorId    String?
+  author      User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  usedCount   Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
 /// 项目级各能力默认适配器。切模型（项目级）= 改这里的 adapterId
@@ -54,6 +87,11 @@ model Episode {
   finalAssetId String?
   /// 整集 BGM 资产（audio.music 任务成功后回写，合成时混音）
   musicAssetId String?
+  /// 合规卡点：pending 未检 | passed 通过（可合成）| blocked 拦截
+  complianceStatus String @default("pending")
+  complianceReport Json   @default("{}")
+  /// AI 生成内容标识水印（合规默认开启，合成时烧角标）
+  watermark        Boolean @default(true)
   scenes       Scene[]
 }
 

@@ -409,6 +409,12 @@ export function Workbench({ projectId }: { projectId: string }) {
           <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/costs`}>
             成本
           </Link>
+          <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/analytics`}>
+            分析
+          </Link>
+          <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/settings`}>
+            设置
+          </Link>
         </nav>
         <div className="ml-auto flex items-center gap-3 text-xs">
           {activeJobs.length > 0 && (

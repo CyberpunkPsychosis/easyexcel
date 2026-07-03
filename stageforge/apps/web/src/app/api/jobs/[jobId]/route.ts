@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { jobId: stri
     const user = await requireUser();
     const job = await prisma.generationJob.findUnique({ where: { id: params.jobId } });
     if (!job) notFound('任务不存在');
-    await assertProjectAccess(job.projectId, user.id);
+    await assertProjectAccess(job.projectId, user.id, 'read');
     return NextResponse.json({ job });
   } catch (e) {
     return handleError(e);

@@ -45,6 +45,8 @@ const createSchema = z.object({
   /** 可选：建项目时直接贴剧本，立即触发分镜拆解 */
   script: z.string().max(100_000).optional(),
   storyboardAdapterId: z.string().optional(),
+  /** 模板市场：套用爆款结构模板 */
+  templateId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -68,7 +70,18 @@ export async function POST(req: NextRequest) {
       const adapterId =
         body.storyboardAdapterId ?? (await resolveAdapterId(project.id, 'text.storyboard'));
       const adapter = getAdapter(adapterId);
-      const input = { script: body.script, characterNames: [] };
+      let guidance: string | undefined;
+      if (body.templateId) {
+        const template = await prisma.template.findUnique({ where: { id: body.templateId } });
+        if (template) {
+          guidance = template.guidance;
+          await prisma.template.update({
+            where: { id: template.id },
+            data: { usedCount: { increment: 1 } },
+          });
+        }
+      }
+      const input = { script: body.script, guidance, characterNames: [] };
       const estimated = adapter.estimateCost(input);
       const job = await prisma.generationJob.create({
         data: {

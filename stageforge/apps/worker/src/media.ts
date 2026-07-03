@@ -94,7 +94,7 @@ export interface ComposeSegment {
 export async function composeVertical(
   segments: ComposeSegment[],
   outPath: string,
-  opts: { musicPath?: string } = {},
+  opts: { musicPath?: string; watermarkText?: string } = {},
 ): Promise<void> {
   if (!hasFfmpeg()) throw new Error('环境缺少 ffmpeg，无法合成成片（本地请安装 ffmpeg，部署见 DEPLOY.md）');
   const inputs = segments.flatMap((s) => ['-i', s.filePath]);
@@ -109,7 +109,12 @@ export async function composeVertical(
         withSubtitles && s.dialogue.trim()
           ? `,drawtext=text='${escapeDrawtext(s.dialogue.slice(0, 40))}':fontcolor=white:fontsize=52:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h-320:font=Sans`
           : '';
-      return `${base}${subtitle}[v${i}]`;
+      // AI 生成内容标识角标（合规卡点：watermark 开启时全片常显）
+      const watermark =
+        withSubtitles && opts.watermarkText
+          ? `,drawtext=text='${escapeDrawtext(opts.watermarkText.slice(0, 40))}':fontcolor=white@0.55:fontsize=26:x=24:y=32:font=Sans`
+          : '';
+      return `${base}${subtitle}${watermark}[v${i}]`;
     });
     const concat = `${segments.map((_, i) => `[v${i}]`).join('')}concat=n=${segments.length}:v=1:a=0[outv]`;
     return [...chains, concat].join(';');

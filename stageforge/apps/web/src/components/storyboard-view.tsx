@@ -43,11 +43,18 @@ export function StoryboardView({ projectId }: { projectId: string }) {
 
   const [script, setScript] = useState('');
   const [adapterId, setAdapterId] = useState('');
+  const [templateId, setTemplateId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
   const storyboardAdapters = (registryData?.adapters ?? []).filter(
     (a) => a.capability === 'text.storyboard',
   );
+  const { data: templatesData } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () =>
+      api<{ templates: { id: string; name: string; description: string }[] }>('/api/templates'),
+    staleTime: 60_000,
+  });
 
   const patchShot = useMutation({
     mutationFn: (p: { shotId: string; data: Record<string, string> }) =>
@@ -59,7 +66,11 @@ export function StoryboardView({ projectId }: { projectId: string }) {
     mutationFn: () =>
       api(`/api/projects/${projectId}/storyboard`, {
         method: 'POST',
-        body: JSON.stringify({ script, adapterId: adapterId || undefined }),
+        body: JSON.stringify({
+          script,
+          adapterId: adapterId || undefined,
+          templateId: templateId || undefined,
+        }),
       }),
     onSuccess: () => {
       setMessage('分镜任务已提交，完成后自动出现在下方与工作台（几秒到几分钟，取决于剧本长度与模型）');
@@ -102,6 +113,19 @@ export function StoryboardView({ projectId }: { projectId: string }) {
               <option key={a.id} value={a.id}>
                 {a.displayName}
                 {a.mock ? '（mock）' : ''}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input w-56"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            title={templatesData?.templates.find((t) => t.id === templateId)?.description ?? '爆款节拍结构，注入分镜提示词'}
+          >
+            <option value="">不套用模板</option>
+            {(templatesData?.templates ?? []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
               </option>
             ))}
           </select>

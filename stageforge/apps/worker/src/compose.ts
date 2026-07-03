@@ -27,6 +27,7 @@ export async function processCompose(jobId: string): Promise<void> {
     const episode = await prisma.episode.findUniqueOrThrow({
       where: { id: job.episodeId },
       include: {
+        project: true,
         scenes: {
           orderBy: { index: 'asc' },
           include: {
@@ -79,8 +80,13 @@ export async function processCompose(jobId: string): Promise<void> {
       }
     }
 
+    // AI 标识角标：水印开启时烧「AI生成 (+备案号)」（备案合规卡点的落地项）
+    const watermarkText = episode.watermark
+      ? `AI生成${episode.project.registrationNo ? ` ${episode.project.registrationNo}` : ''}`
+      : undefined;
+
     const outPath = path.join(tmp, 'final.mp4');
-    await composeVertical(segments, outPath, { musicPath });
+    await composeVertical(segments, outPath, { musicPath, watermarkText });
     const finalBuf = await fs.readFile(outPath);
 
     const asset = await prisma.asset.create({

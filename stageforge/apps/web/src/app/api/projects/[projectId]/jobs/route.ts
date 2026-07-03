@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(_req: NextRequest, { params }: { params: { projectId: string } }) {
   try {
     const user = await requireUser();
-    await assertProjectAccess(params.projectId, user.id);
+    await assertProjectAccess(params.projectId, user.id, 'read');
     const jobs = await prisma.generationJob.findMany({
       where: { projectId: params.projectId },
       orderBy: { createdAt: 'desc' },

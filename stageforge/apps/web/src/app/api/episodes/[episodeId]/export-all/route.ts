@@ -3,6 +3,7 @@ import { prisma } from '@stageforge/db';
 import { COMPOSE_QUEUE, getQueue } from '@stageforge/core';
 import { requireUser } from '@/lib/auth';
 import { assertProjectAccess, handleError, notFound } from '@/lib/server';
+import { runComplianceCheck } from '@/lib/compliance';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,15 @@ export async function POST(_req: NextRequest, { params }: { params: { episodeId:
     });
     if (!episode) notFound('剧集不存在');
     await assertProjectAccess(episode.projectId, user.id);
+
+    // 备案合规卡点：出海批量导出同样受控
+    const status =
+      episode.complianceStatus === 'pending'
+        ? (await runComplianceCheck(episode.id)).status
+        : episode.complianceStatus;
+    if (status === 'blocked') {
+      throw Object.assign(new Error('合规检查未通过，禁止导出（详见设置页报告）'), { status: 422 });
+    }
 
     const langs = new Set<string>();
     for (const scene of episode.scenes) {
