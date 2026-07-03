@@ -1,0 +1,28 @@
+{
+  "name": "stageforge-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StageForge — 模型无关的 AI 短剧全流程生产平台（每个环节可自由切换任意模型）",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,worker -c blue,magenta \"npm:dev:web\" \"npm:dev:worker\"",
+    "dev:web": "npm run dev -w @stageforge/web",
+    "dev:worker": "npm run dev -w @stageforge/worker",
+    "build": "npm run db:generate && npm run build -w @stageforge/web",
+    "typecheck": "npm run db:generate && npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run generate -w @stageforge/db",
+    "db:push": "npm run push -w @stageforge/db",
+    "db:seed": "npm run seed -w @stageforge/db",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

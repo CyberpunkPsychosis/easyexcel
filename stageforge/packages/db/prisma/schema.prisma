@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  projects     Project[]
+  ledger       CreditLedger[]
+}
+
+model Project {
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  ownerId      String
+  owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  episodes     Episode[]
+  characters   Character[]
+  modelConfigs ModelConfig[]
+  assets       Asset[]
+  jobs         GenerationJob[]
+  ledger       CreditLedger[]
+}
+
+/// 项目级各能力默认适配器。切模型（项目级）= 改这里的 adapterId
+model ModelConfig {
+  id         String  @id @default(cuid())
+  projectId  String
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  capability String
+  adapterId  String
+
+  @@unique([projectId, capability])
+}
+
+model Episode {
+  id           String  @id @default(cuid())
+  projectId    String
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  index        Int
+  title        String
+  status       String  @default("draft") // draft | rendering | rendered
+  finalAssetId String?
+  scenes       Scene[]
+}
+
+model Scene {
+  id        String  @id @default(cuid())
+  episodeId String
+  episode   Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  index     Int
+  title     String
+  location  String  @default("")
+  shots     Shot[]
+}
+
+/// 流水线最小单元：一条分镜行的全部信息
+model Shot {
+  id           String          @id @default(cuid())
+  sceneId      String
+  scene        Scene           @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  index        Int
+  dialogue     String          @default("")
+  visualPrompt String          @default("")
+  shotType     String          @default("中景")
+  emotion      String          @default("平静")
+  cameraMove   String          @default("固定")
+  durationSec  Float           @default(5)
+  characterIds String[]        @default([])
+  stages       ShotStage[]
+  variants     Variant[]
+  jobs         GenerationJob[]
+}
+
+/// 每环节记录「用哪个 adapter + 什么参数」。单镜覆盖项目默认 = 改这里的 adapterId
+model ShotStage {
+  id         String  @id @default(cuid())
+  shotId     String
+  shot       Shot    @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  capability String
+  adapterId  String? // null = 跟随项目 ModelConfig 默认
+  params     Json    @default("{}")
+
+  @@unique([shotId, capability])
+}
+
+/// 跨镜头一致性实体：持有参考资产，模型无关，只注入声明 supportsReferenceImage 的适配器
+model Character {
+  id              String  @id @default(cuid())
+  projectId       String
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name            String
+  description     String  @default("")
+  refAssetId      String?
+  /// 固定一致性话术（调研实践：即梦全能参考 @引用 + 此话术是国内短剧不跳脸关键）
+  consistencyNote String  @default("同一角色，服装一致，发型不变，保持人物样貌与服装一致")
+  /// per-model 一致性资产（LoRA 权重 id / 参考图 hash 等），keyed by adapterId
+  modelAssets     Json    @default("{}")
+}
+
+/// 统一资产表（image/video/audio/final）
+model Asset {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        String // image | video | audio | final
+  storageKey  String
+  contentType String
+  meta        Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  variants    Variant[]
+}
+
+/// 重roll产物：一次生成 = 一个变体，成本累加，用户选一个作为 selected
+model Variant {
+  id         String   @id @default(cuid())
+  shotId     String
+  shot       Shot     @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  capability String
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  jobId      String?
+  selected   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model GenerationJob {
+  id                 String    @id @default(cuid())
+  projectId          String
+  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shotId             String?
+  shot               Shot?     @relation(fields: [shotId], references: [id], onDelete: SetNull)
+  episodeId          String?
+  capability         String
+  adapterId          String
+  status             String    @default("queued") // queued | running | succeeded | failed
+  input              Json
+  output             Json?
+  error              String?
+  estimatedCostCents Int       @default(0)
+  actualCostCents    Int       @default(0)
+  currency           String    @default("CNY")
+  attempts           Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  startedAt          DateTime?
+  finishedAt         DateTime?
+}
+
+/// 充值/消耗流水 —— 成本是一等公民
+model CreditLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  jobId     String?
+  /// 消耗为负、充值为正，单位分
+  deltaCents Int
+  currency   String
+  kind       String // charge | topup
+  capability String?
+  adapterId  String?
+  note       String?
+  createdAt  DateTime @default(now())
+}

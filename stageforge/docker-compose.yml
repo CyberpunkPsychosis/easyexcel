@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stageforge
+      POSTGRES_PASSWORD: stageforge
+      POSTGRES_DB: stageforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 对象存储（本地开发用 MinIO 模拟 S3；生产换 S3/Cloudflare R2，见 DEPLOY.md）
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: stageforge
+      MINIO_ROOT_PASSWORD: stageforge
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 stageforge stageforge;
+      mc mb -p local/stageforge || true;
+      exit 0
+      "
+
+volumes:
+  pgdata:
+  miniodata:
