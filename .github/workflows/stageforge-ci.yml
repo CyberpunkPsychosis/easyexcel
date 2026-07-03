@@ -1,0 +1,32 @@
+name: StageForge CI
+
+on:
+  push:
+    branches: [master, main]
+    paths: ['stageforge/**', '.github/workflows/stageforge-ci.yml']
+  pull_request:
+    paths: ['stageforge/**', '.github/workflows/stageforge-ci.yml']
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stageforge
+    env:
+      # 构建期占位值：所有页面/路由均为 dynamic，构建不连库
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      NEXTAUTH_SECRET: ci-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: stageforge/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck (all workspaces)
+        run: npm run typecheck
+      - name: Build web
+        run: npm run build

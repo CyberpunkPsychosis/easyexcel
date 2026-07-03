@@ -1,0 +1,147 @@
+# StageForge
+
+**模型无关的 AI 短剧全流程生产平台** —— 从剧本、分镜、关键帧、视频、配音、口型到 9:16 成片，
+**每一个环节都能自由切换任意模型**：项目级设默认，单个镜头可覆盖，还能让两个模型跑同一镜头 A/B 选优。
+
+对标字节「小云雀短剧 Agent」（10 万字剧本一键成片），但小云雀全流程锁死 Seedance 一个模型；
+StageForge 的架构第一性原则是：
+
+> **新增一个模型 = 新增一个 adapter 文件 + 注册表加一行，不改动任何流水线代码。**
+
+## 架构
+
+```
+┌─ apps/web (Next.js 14) ──────────────────────────────┐
+│  仪表盘 / 三栏工作台(Stage Rail) / 分镜表 / 成本仪表盘  │
+│  API routes: 提交任务 + 查状态（不做长耗时生成）        │
+└───────────────┬──────────────────────────────────────┘
+                │ BullMQ (Redis)
+┌─ apps/worker ─▼──────────────────────────────────────┐
+│  generation 队列: 读 job → 找 adapter → submit→poll   │
+│  compose 队列: ffmpeg 拼接+烧字幕 → 9:16 成片          │
+└───────────────┬──────────────────────────────────────┘
+                │
+┌─ packages/adapters ──────────────────────────────────┐
+│  registry: Record<Capability, ModelAdapter[]>         │
+│  claude(真实) · seedance/kling/hailuo/veo/… (mock)    │
+├─ packages/core ──────────────────────────────────────┤
+│  Capability/ModelAdapter/CostModel 契约 · 存储 · 队列  │
+├─ packages/db (Prisma + PostgreSQL) ──────────────────┤
+│  Project→Episode→Scene→Shot→Variant / ShotStage       │
+│  ModelConfig(项目默认模型) / CreditLedger(成本流水)     │
+└──────────────────────────────────────────────────────┘
+```
+
+**13 个能力插槽**：`text.script / text.storyboard / text.translate / image.t2i / image.character /
+video.t2v / video.i2v / audio.tts / audio.voiceclone / audio.lipsync / audio.music / audio.sfx / render.compose`
+
+**切模型的三个层级**（全部只是改一个 adapterId，零代码分支）：
+1. 项目级默认：`ModelConfig.adapterId`
+2. 单镜覆盖：`ShotStage.adapterId`（工作台右侧 Stage Rail 下拉）
+3. 单次 A/B：生成请求带 `adapterId` 参数（不落库，只出一个对比变体）
+
+## 快速开始
+
+```bash
+cp .env.example .env          # 按需填 ANTHROPIC_API_KEY（不填则全 mock，demo 不断链）
+docker compose up -d           # Postgres + Redis + MinIO
+npm install
+npm run db:push && npm run db:seed
+npm run dev                    # web:3000 + worker
+```
+
+登录 `demo@stageforge.dev / stageforge`。seed 自带示例项目（2 角色、1 集分镜）。
+
+> 本地需要 `ffmpeg`（mock 视频渲染与成片合成）。没有 ffmpeg 时 mock 视频退化为 SVG 占位、
+> 合成会给出明确报错，其余全流程不受影响。
+
+### 一条龙体验
+
+1. 首页「新建项目」→ 粘贴剧本（≤10 万字）→ 选分镜模型 → 创建
+2. 几秒后分镜表出现（无 ANTHROPIC_API_KEY 时用确定性 mock；有 key 时走 Claude 真实拆解）
+3. 工作台选中镜头 → 右侧 Stage Rail 依次「生成」关键帧 → 视频（下拉可换 Seedance/可灵/海螺/Veo/…）
+4. 同一环节点「A/B 对比…」用另一个模型再出一个变体，缩略图点击选优
+5. 左侧剧集「合成」→ 拼接选中变体 + 烧字幕 → 成片下载
+6. 「成本」页看按环节/模型拆解的真实流水（含全部重roll）
+
+## 证明：新增一个模型只需一个文件 + 一行
+
+活示例见 [`packages/adapters/src/adapters/video/_example-newmodel.ts`](packages/adapters/src/adapters/video/_example-newmodel.ts)。
+
+1. 复制该文件为 `happyhorse.ts`，填新模型的 `id/caps/cost/notes`；
+2. 在 [`registry.ts`](packages/adapters/src/registry.ts) 的 `ALL_ADAPTERS` 数组加一行 `happyhorseI2V,`；
+3. 完成 —— Stage Rail 下拉、成本估算、生成流水线、A/B 竞技场自动识别新模型。
+
+接真实 API 时把 `defineMockVideoAdapter` 换成手写 `ModelAdapter`（submit 提交第三方任务、poll 查状态），
+契约不变。真实与 mock 适配器在流水线眼里没有任何区别（参考 `text/claude.ts`）。
+
+## 模型注册表（M1 seed）
+
+能力声明与参考单价来自 2026-07 多源交叉核验的调研（详见构建规格附录 A），
+存疑数据在各 adapter 文件注释中标注来源与不确定性。要点：
+
+| 环节 | 可选模型 | 备注 |
+|---|---|---|
+| 分镜/剧本/翻译 | **Claude（真实）**、GPT/DeepSeek/Gemini（mock） | 无 key 自动降级 mock |
+| 关键帧 | 即梦、Midjourney V7、Flux、ComfyUI 本地 | |
+| 视频 | Seedance 2.0、可灵 3.0、海螺 2.3、Veo 3.1、Sora 2（停服警告）、Wan 2.7、Vidu、Runway、LTX-2 | 单段时长上限差异大（8s~60s），UI 徽标展示 |
+| 配音/克隆 | ElevenLabs v3、即梦语音、MiniMax | |
+| 口型 | sync.so Sync-3、MuseTalk（开源）、剪映 | |
+| 配乐/音效 | Suno、Udio、即梦音效 | |
+| 合成 | 内置 ffmpeg（字幕默认烧制：80% 观众静音观看） | |
+
+⚠️ 成本口径：UI 区分「单次生成成本」与「预计总成本（含重roll）」——
+行业单次成功率常不足 40%，抽卡税才是真实成本大头。
+
+## 常用命令
+
+```bash
+npm run dev            # web + worker 一起起
+npm run typecheck      # 全 workspace 类型检查
+npm run build          # 生产构建（含 prisma generate）
+npm run db:push        # 同步 schema 到数据库
+npm run db:seed        # 演示数据
+```
+
+## 部署
+
+见 [DEPLOY.md](./DEPLOY.md)：Vercel（web）+ Railway（Postgres/Redis/worker）+ R2/S3（资产）。
+注意本项目**不能部署到 GitHub Pages**（有数据库/队列/服务端合成）。
+
+## 里程碑
+
+- **M1** ✅：可运行骨架 —— 鉴权、项目、剧本→分镜（Claude 真实）、镜头流水线（mock 生成）、
+  变体/A/B/选优、ffmpeg 合成、成本流水、全模型注册表 + Stage Rail 切换
+- **M2** ✅（当前）：
+  - 真实 API 适配器：**ElevenLabs TTS**（`ELEVENLABS_API_KEY`）、**Seedance 火山引擎 Ark 异步任务**
+    （`ARK_API_KEY`，真正的 submit→poll 路径 + 关键帧 presigned URL 传参）；无 key 自动降级 mock
+  - **角色库**：建角色 / 生成定妆参考图（image.character 任意模型）/ 上传定妆照 / 一致性话术编辑
+  - **正反打一键拆分**：多人对手戏锁脸失败 → 拆成单人正打+反打交叉剪辑（调研回退策略产品化）
+  - **整集批量生成**：一键排队全集关键帧/视频/配音（默认跳过已有变体）
+  - **出海翻译**：整集台词批量翻译写入 `shot.translations[lang]`，合成时按语言烧字幕
+  - **配乐**：按剧情情绪线生成整集 BGM，合成自动混音（`-shortest` 对齐）
+- **M3** ✅（当前）：
+  - **声音克隆建库**：角色库上传约 1 分钟样音 → ElevenLabs Instant Cloning 建专属音色
+    （`Character.voiceId`），该角色台词 TTS 自动使用；无 key 建 mock 音色
+  - **真实口型**：sync.so generate 提交+轮询（`SYNC_SO_API_KEY`；素材经 presigned URL 传参，
+    local 存储自动降级透传）
+  - **可灵真实接入**：开放平台 image2video，`KLING_ACCESS_KEY/SECRET_KEY` 签 HS256 JWT
+  - **海螺真实接入**：MiniMax 视频任务（提交→查询→取件，`MINIMAX_API_KEY`）
+  - **一致性打分**：Claude 视觉裁判对比定妆参考图 vs 关键帧（脸/发型/服装），分数徽标
+    直接标在变体缩略图上，快速筛掉跳脸变体（定位为相对参考，不承诺绝对百分比）
+  - **多语成片批量导出**：原文 + 全部已译语种一键各出一版成片，工作台按语言列出可下载
+  - ⚠️ 第三方接口形态（Ark/可灵/MiniMax/sync.so）按调研时点文档编写并在代码注释标注
+    「接入时对照最新官方文档校验」；无 key 一律优雅降级 mock，链路永不断
+- **M4** ✅（收官）：
+  - **团队协作**：按邮箱邀请成员，owner / editor / viewer 三级权限（读写分级贯穿全部 API），
+    协作项目出现在成员仪表盘
+  - **备案合规卡点**：合成/导出前强制检查 —— 备案号（`Project.registrationNo`）、
+    AI 标识水印（开启时 ffmpeg 烧「AI生成+备案号」角标）、台词内容 LLM 预审（Claude，
+    无 key 降级）；blocked 状态禁止出片，设置页可看报告并重检
+  - **模板市场**：4 个内置爆款结构模板（霸总打脸/重生信息差/赘婿扮猪吃虎/甜宠拉扯，
+    含 2 秒钩子公式与节拍），新建项目和分镜生成一键套用；自己跑通的结构可发布为模板复用
+  - **数据分析**：各环节成功率/平均耗时、重roll分布（对照行业「单次成功率不足 40%」）、
+    成本日趋势、模型用量占比 —— 把抽卡税变成看得见的数字
+
+**M1-M4 全部交付。** 后续方向（M5+）：真实平台发行对接（抖音/红果 API）、
+LoRA 训练任务真实接入、模板市场公开分享与分成、多租户计费。
