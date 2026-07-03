@@ -61,6 +61,41 @@ export function defineMockAdapter<I, O>(
   };
 }
 
+/** 视频占位产出（mock 路径与真实适配器的无 key 降级共用） */
+export async function produceMockVideo(
+  meta: { id: string; displayName: string; caps: AdapterCaps; hue: number },
+  input: I2VInput,
+  ctx: RunContext,
+): Promise<{ output: AssetOutput; usage: Usage }> {
+  const durationSec = clampDuration(input.durationSec, meta.caps.maxDurationSec);
+  const refNote = input.characterRefs?.length
+    ? `锁角色: ${input.characterRefs.map((r) => r.name).join('/')}`
+    : '';
+  const rendered = await ctx.renderPlaceholderVideo({
+    durationSec,
+    title: input.prompt.slice(0, 30),
+    subtitle: `${meta.displayName} · ${input.resolution} ${refNote}`,
+    hue: meta.hue,
+  });
+  if (rendered) {
+    return { output: { asset: rendered }, usage: { seconds: durationSec } };
+  }
+  // 无 ffmpeg：SVG 占位（kind 仍为 video，meta 标记 placeholder，合成时会被跳过并提示）
+  const asset = await ctx.saveAsset({
+    kind: 'video',
+    data: svgPlaceholder({
+      title: input.prompt.slice(0, 40),
+      subtitle: `视频占位（无 ffmpeg）· ${durationSec}s ${refNote}`,
+      badge: meta.id,
+      hue: meta.hue,
+    }),
+    contentType: 'image/svg+xml',
+    ext: 'svg',
+    meta: { placeholder: 'no-ffmpeg', durationSec },
+  });
+  return { output: { asset }, usage: { seconds: durationSec } };
+}
+
 /** 视频类 mock：ffmpeg 渲染占位 mp4，无 ffmpeg 时降级 SVG 占位 */
 export function defineMockVideoAdapter(
   meta: AdapterMeta & { hue: number },
@@ -69,35 +104,7 @@ export function defineMockVideoAdapter(
   return defineMockAdapter<I2VInput, AssetOutput>(
     rest,
     (input) => ({ seconds: clampDuration(input.durationSec, meta.caps.maxDurationSec) }),
-    async (input, ctx) => {
-      const durationSec = clampDuration(input.durationSec, meta.caps.maxDurationSec);
-      const refNote = input.characterRefs?.length
-        ? `锁角色: ${input.characterRefs.map((r) => r.name).join('/')}`
-        : '';
-      const rendered = await ctx.renderPlaceholderVideo({
-        durationSec,
-        title: input.prompt.slice(0, 30),
-        subtitle: `${meta.displayName} · ${input.resolution} ${refNote}`,
-        hue,
-      });
-      if (rendered) {
-        return { output: { asset: rendered }, usage: { seconds: durationSec } };
-      }
-      // 无 ffmpeg：SVG 占位（kind 仍为 video，meta 标记 placeholder，合成时会被跳过并提示）
-      const asset = await ctx.saveAsset({
-        kind: 'video',
-        data: svgPlaceholder({
-          title: input.prompt.slice(0, 40),
-          subtitle: `视频占位（无 ffmpeg）· ${durationSec}s ${refNote}`,
-          badge: meta.id,
-          hue,
-        }),
-        contentType: 'image/svg+xml',
-        ext: 'svg',
-        meta: { placeholder: 'no-ffmpeg', durationSec },
-      });
-      return { output: { asset }, usage: { seconds: durationSec } };
-    },
+    (input, ctx) => produceMockVideo({ ...rest, hue }, input, ctx),
   );
 }
 

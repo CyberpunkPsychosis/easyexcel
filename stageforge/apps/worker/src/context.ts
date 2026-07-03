@@ -39,6 +39,11 @@ export function buildRunContext(job: GenerationJob): RunContext {
         meta: { mock: true, durationSec: opts.durationSec },
       });
     },
+    async assetPublicUrl(assetId: string): Promise<string | null> {
+      const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+      if (!asset?.storageKey) return null;
+      return storage.presignedUrl(asset.storageKey);
+    },
     log(msg: string) {
       console.log(`[job ${job.id}] ${msg}`);
     },

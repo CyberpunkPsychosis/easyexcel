@@ -109,6 +109,11 @@ export interface RunContext {
     subtitle?: string;
     hue?: number;
   }): Promise<SavedAsset | null>;
+  /**
+   * 资产的公网可访问 URL（S3 预签名）。真实 i2v 适配器把关键帧传给
+   * 第三方 API 时需要；local 存储驱动返回 null（适配器应降级为纯文生）。
+   */
+  assetPublicUrl(assetId: string): Promise<string | null>;
   log(msg: string): void;
 }
 

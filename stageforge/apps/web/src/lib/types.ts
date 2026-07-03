@@ -84,9 +84,22 @@ export interface ApiShot {
   cameraMove: string;
   durationSec: number;
   characterIds: string[];
+  /** 出海译文 { lang: text } */
+  translations: Record<string, string>;
   stages: ApiStage[];
   variants: ApiVariant[];
 }
+
+/** 出海目标语言（M2 先覆盖主流短剧出海市场） */
+export const TARGET_LANGS: [string, string][] = [
+  ['en', '英语'],
+  ['ja', '日语'],
+  ['ko', '韩语'],
+  ['es', '西班牙语'],
+  ['pt', '葡萄牙语'],
+  ['id', '印尼语'],
+  ['th', '泰语'],
+];
 
 export interface ApiScene {
   id: string;
@@ -102,6 +115,7 @@ export interface ApiEpisode {
   title: string;
   status: string;
   finalAssetId: string | null;
+  musicAssetId: string | null;
   scenes: ApiScene[];
 }
 

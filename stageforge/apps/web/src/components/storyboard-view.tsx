@@ -142,6 +142,12 @@ export function StoryboardView({ projectId }: { projectId: string }) {
                     value={shot.dialogue}
                     onSave={(v) => patchShot.mutate({ shotId: shot.id, data: { dialogue: v } })}
                   />
+                  {Object.entries(shot.translations ?? {}).map(([code, text]) => (
+                    <p key={code} className="mt-0.5 text-[10px] leading-4 text-slate-500">
+                      <span className="badge mr-1 bg-slate-800 text-slate-400">{code}</span>
+                      {text}
+                    </p>
+                  ))}
                 </td>
                 <td className="p-2">
                   <EditableCell

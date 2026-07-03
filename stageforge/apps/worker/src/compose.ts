@@ -39,6 +39,9 @@ export async function processCompose(jobId: string): Promise<void> {
       },
     });
 
+    // 字幕语言：默认原文；lang 指定时用出海译文（shot.translations[lang]）
+    const lang = (job.input as { lang?: string }).lang;
+
     const segments: ComposeSegment[] = [];
     let skipped = 0;
     for (const scene of episode.scenes) {
@@ -52,7 +55,9 @@ export async function processCompose(jobId: string): Promise<void> {
         }
         const filePath = path.join(tmp, `${segments.length}.mp4`);
         await fs.writeFile(filePath, await storage.get(selected.asset.storageKey));
-        segments.push({ filePath, dialogue: shot.dialogue });
+        const translations = shot.translations as Record<string, string>;
+        const dialogue = (lang && translations[lang]) || shot.dialogue;
+        segments.push({ filePath, dialogue });
       }
     }
 
@@ -63,8 +68,19 @@ export async function processCompose(jobId: string): Promise<void> {
     }
     if (skipped > 0) console.warn(`compose: ${skipped} 个镜头缺少已选视频变体，已跳过`);
 
+    // BGM 混音：episode.musicAssetId 存在则加音轨（-shortest 对齐视频长度）
+    let musicPath: string | undefined;
+    if (episode.musicAssetId) {
+      const musicAsset = await prisma.asset.findUnique({ where: { id: episode.musicAssetId } });
+      if (musicAsset?.storageKey) {
+        const ext = musicAsset.contentType.includes('mpeg') ? 'mp3' : 'wav';
+        musicPath = path.join(tmp, `bgm.${ext}`);
+        await fs.writeFile(musicPath, await storage.get(musicAsset.storageKey));
+      }
+    }
+
     const outPath = path.join(tmp, 'final.mp4');
-    await composeVertical(segments, outPath);
+    await composeVertical(segments, outPath, { musicPath });
     const finalBuf = await fs.readFile(outPath);
 
     const asset = await prisma.asset.create({

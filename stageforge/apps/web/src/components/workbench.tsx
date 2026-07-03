@@ -9,6 +9,7 @@ import { StageRail } from '@/components/stage-rail';
 import { VariantPreview, VariantStrip } from '@/components/variant-strip';
 import {
   CAPABILITY_LABEL,
+  TARGET_LANGS,
   formatCents,
   type ApiAdapter,
   type ApiEpisode,
@@ -71,6 +72,12 @@ function ShotEditor({ projectId, shot }: { projectId: string; shot: ApiShot }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
   });
 
+  // 一致性回退策略（附录 A.2）：双人对手戏锁脸失败 → 一键拆成单人正反打交叉剪辑
+  const splitReverse = useMutation({
+    mutationFn: () => api(`/api/shots/${shot.id}/split-reverse`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
+  });
+
   const dirty = dialogue !== shot.dialogue || visualPrompt !== shot.visualPrompt;
 
   return (
@@ -92,12 +99,23 @@ function ShotEditor({ projectId, shot }: { projectId: string; shot: ApiShot }) {
         <span>{shot.emotion}</span>
         <span>{shot.cameraMove}</span>
         <span>{shot.durationSec}s</span>
+        {shot.characterIds.length >= 2 && (
+          <button
+            className="btn-ghost text-xs"
+            disabled={splitReverse.isPending}
+            onClick={() => splitReverse.mutate()}
+            title="双人对手戏锁脸失败时的回退：拆成单人正打+反打交叉剪辑，每段只出一个人脸"
+          >
+            拆正反打
+          </button>
+        )}
         {dirty && (
           <button className="btn-primary ml-auto text-xs" disabled={save.isPending} onClick={() => save.mutate()}>
             保存修改
           </button>
         )}
       </div>
+      {splitReverse.isError && <p className="text-xs text-red-400">{splitReverse.error.message}</p>}
     </div>
   );
 }
@@ -114,17 +132,59 @@ function EpisodeTree({
   onSelect: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const [lang, setLang] = useState('');
+  const invalidateJobs = () => queryClient.invalidateQueries({ queryKey: ['jobs', projectId] });
+
   const compose = useMutation({
-    mutationFn: (episodeId: string) => api(`/api/episodes/${episodeId}/compose`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs', projectId] }),
+    mutationFn: (episodeId: string) =>
+      api(`/api/episodes/${episodeId}/compose`, {
+        method: 'POST',
+        body: JSON.stringify(lang ? { lang } : {}),
+      }),
+    onSuccess: invalidateJobs,
+  });
+  // 整集批量生成：工业化产能入口（默认跳过已有变体的镜头）
+  const batch = useMutation({
+    mutationFn: (p: { episodeId: string; capability: string }) =>
+      api(`/api/episodes/${p.episodeId}/batch-generate`, {
+        method: 'POST',
+        body: JSON.stringify({ capability: p.capability }),
+      }),
+    onSuccess: invalidateJobs,
+  });
+  const music = useMutation({
+    mutationFn: (episodeId: string) => api(`/api/episodes/${episodeId}/music`, { method: 'POST', body: '{}' }),
+    onSuccess: invalidateJobs,
+  });
+  const translate = useMutation({
+    mutationFn: (p: { episodeId: string; targetLang: string }) =>
+      api(`/api/episodes/${p.episodeId}/translate`, {
+        method: 'POST',
+        body: JSON.stringify({ targetLang: p.targetLang }),
+      }),
+    onSuccess: invalidateJobs,
   });
 
   return (
     <nav className="space-y-4">
+      <div className="flex items-center gap-2">
+        <label className="text-[10px] text-slate-500">成片字幕</label>
+        <select className="input w-24 px-1.5 py-1 text-[11px]" value={lang} onChange={(e) => setLang(e.target.value)}>
+          <option value="">原文</option>
+          {TARGET_LANGS.map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
       {episodes.map((ep) => (
         <div key={ep.id}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-white">{ep.title}</span>
+            <span className="text-sm font-semibold text-white">
+              {ep.title}
+              {ep.musicAssetId && <span title="已有配乐，合成时自动混音"> ♪</span>}
+            </span>
             <div className="flex items-center gap-1">
               {ep.finalAssetId && (
                 <a
@@ -140,13 +200,48 @@ function EpisodeTree({
                 className="btn-ghost px-2 py-0.5 text-[10px]"
                 disabled={compose.isPending || ep.status === 'rendering'}
                 onClick={() => compose.mutate(ep.id)}
-                title="拼接每镜选中的视频变体，烧字幕，输出 9:16 成片"
+                title="拼接每镜选中的视频变体，烧字幕（按上方语言），混 BGM，输出 9:16 成片"
               >
                 {ep.status === 'rendering' ? '合成中…' : '合成'}
               </button>
             </div>
           </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <select
+              className="input w-auto px-1.5 py-0.5 text-[10px]"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) batch.mutate({ episodeId: ep.id, capability: e.target.value });
+              }}
+              title="对整集所有镜头的某个环节一键排队（已有变体的镜头自动跳过）"
+            >
+              <option value="">批量生成…</option>
+              <option value="image.t2i">全部关键帧</option>
+              <option value="video.i2v">全部视频</option>
+              <option value="audio.tts">全部配音</option>
+            </select>
+            <button
+              className="btn-ghost px-2 py-0.5 text-[10px]"
+              disabled={music.isPending}
+              onClick={() => music.mutate(ep.id)}
+              title="按剧情情绪线生成整集 BGM，合成时自动混音"
+            >
+              配乐
+            </button>
+            {lang && (
+              <button
+                className="btn-ghost px-2 py-0.5 text-[10px]"
+                disabled={translate.isPending}
+                onClick={() => translate.mutate({ episodeId: ep.id, targetLang: lang })}
+                title={`把整集台词批量翻译为${TARGET_LANGS.find(([c]) => c === lang)?.[1]}（合成时按上方语言烧字幕）`}
+              >
+                译{TARGET_LANGS.find(([c]) => c === lang)?.[1]}
+              </button>
+            )}
+          </div>
           {compose.isError && <p className="text-[10px] text-red-400">{compose.error.message}</p>}
+          {batch.isError && <p className="text-[10px] text-red-400">{batch.error.message}</p>}
+          {translate.isError && <p className="text-[10px] text-red-400">{translate.error.message}</p>}
           {ep.scenes.map((scene) => (
             <div key={scene.id} className="mt-2">
               <div className="text-xs text-slate-500">
@@ -225,6 +320,9 @@ export function Workbench({ projectId }: { projectId: string }) {
           <span className="badge bg-blue-900/50 text-blue-300">工作台</span>
           <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/storyboard`}>
             分镜表
+          </Link>
+          <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/characters`}>
+            角色库
           </Link>
           <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/costs`}>
             成本

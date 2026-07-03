@@ -6,3 +6,4 @@ node_modules/
 *.tsbuildinfo
 dist/
 .DS_Store
+dump.rdb

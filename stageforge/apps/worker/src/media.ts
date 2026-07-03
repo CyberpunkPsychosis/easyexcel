@@ -88,12 +88,17 @@ export interface ComposeSegment {
 }
 
 /**
- * 成片合成：多段 mp4 → 统一 1080x1920 竖屏 → 逐段烧台词字幕 → concat。
+ * 成片合成：多段 mp4 → 统一 1080x1920 竖屏 → 逐段烧台词字幕 → concat（可选 BGM 混音）。
  * 字幕默认开启：调研核验约 80% 观众静音观看短剧，字幕直接影响完播率（附录 A.4）。
  */
-export async function composeVertical(segments: ComposeSegment[], outPath: string): Promise<void> {
+export async function composeVertical(
+  segments: ComposeSegment[],
+  outPath: string,
+  opts: { musicPath?: string } = {},
+): Promise<void> {
   if (!hasFfmpeg()) throw new Error('环境缺少 ffmpeg，无法合成成片（本地请安装 ffmpeg，部署见 DEPLOY.md）');
   const inputs = segments.flatMap((s) => ['-i', s.filePath]);
+  if (opts.musicPath) inputs.push('-i', opts.musicPath);
 
   const buildFilter = (withSubtitles: boolean) => {
     const chains = segments.map((s, i) => {
@@ -110,7 +115,10 @@ export async function composeVertical(segments: ComposeSegment[], outPath: strin
     return [...chains, concat].join(';');
   };
 
-  const common = ['-map', '[outv]', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath];
+  const audioArgs = opts.musicPath
+    ? ['-map', `${segments.length}:a`, '-c:a', 'aac', '-shortest']
+    : [];
+  const common = ['-map', '[outv]', ...audioArgs, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath];
   try {
     await runFfmpeg([...inputs, '-filter_complex', buildFilter(true), ...common]);
   } catch {

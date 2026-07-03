@@ -170,7 +170,7 @@ export const claudeTranslate: ModelAdapter<TranslateInput, TranslateOutput> = {
       };
     }
     const { text, usage } = await callClaude(
-      `把下面的短剧台词翻译成 ${input.targetLang}，保持口语化、贴合竖屏短剧节奏，只输出译文：\n${input.text}`,
+      `把下面的短剧台词翻译成 ${input.targetLang}，保持口语化、贴合竖屏短剧节奏。台词可能由多段组成、段与段用 @@@ 分隔：逐段翻译，输出保持相同的段数、顺序与 @@@ 分隔符，只输出译文：\n${input.text}`,
       16000,
     );
     return { externalId: `claude:${ctx.jobId}`, data: { output: { text }, usage } };

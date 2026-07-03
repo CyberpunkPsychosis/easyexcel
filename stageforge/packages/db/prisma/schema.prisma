@@ -52,6 +52,8 @@ model Episode {
   title        String
   status       String  @default("draft") // draft | rendering | rendered
   finalAssetId String?
+  /// 整集 BGM 资产（audio.music 任务成功后回写，合成时混音）
+  musicAssetId String?
   scenes       Scene[]
 }
 
@@ -78,6 +80,8 @@ model Shot {
   cameraMove   String          @default("固定")
   durationSec  Float           @default(5)
   characterIds String[]        @default([])
+  /// 出海译文：{ "en": "...", "id": "..." }，合成时按 lang 选字幕
+  translations Json            @default("{}")
   stages       ShotStage[]
   variants     Variant[]
   jobs         GenerationJob[]

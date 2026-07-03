@@ -49,6 +49,23 @@ export async function processGeneration(jobId: string): Promise<void> {
 
     if (job.capability === 'text.storyboard') {
       await materializeStoryboard(job, (output as StoryboardOutput).storyboard);
+    } else if (job.capability === 'text.translate' && job.episodeId) {
+      await applyEpisodeTranslations(job, (output as { text: string }).text);
+    } else if (job.capability === 'audio.music' && job.episodeId && isAssetOutput(output)) {
+      // 整集 BGM：回写 Episode.musicAssetId，合成时混音
+      await prisma.episode.update({
+        where: { id: job.episodeId },
+        data: { musicAssetId: output.asset.assetId },
+      });
+    } else if (job.capability === 'image.character' && isAssetOutput(output)) {
+      // 角色参考图生成：回写 Character.refAssetId（跨镜头一致性的锚）
+      const characterId = (job.input as { characterId?: string }).characterId;
+      if (characterId) {
+        await prisma.character.update({
+          where: { id: characterId },
+          data: { refAssetId: output.asset.assetId },
+        });
+      }
     } else if (job.shotId && isAssetOutput(output)) {
       // 每次生成 = 一个变体；首个变体自动选中，重roll需手动选优
       const existingSelected = await prisma.variant.findFirst({
@@ -111,6 +128,31 @@ function isAssetOutput(output: unknown): output is AssetOutput {
     'asset' in output &&
     typeof (output as AssetOutput).asset?.assetId === 'string'
   );
+}
+
+/**
+ * 出海译文回写：翻译任务把整集台词用分隔符拼成一段送 LLM，
+ * 这里按分隔符拆回并写入各镜头的 translations[lang]。
+ */
+async function applyEpisodeTranslations(job: GenerationJob, translatedText: string): Promise<void> {
+  const input = job.input as { shotIds?: string[]; separator?: string; targetLang?: string };
+  const shotIds = input.shotIds ?? [];
+  const separator = input.separator ?? '\n@@@\n';
+  const lang = input.targetLang ?? 'en';
+  const parts = translatedText.split(separator.trim()).map((p) => p.trim()).filter((p) => p.length > 0);
+  for (const [i, shotId] of shotIds.entries()) {
+    const part = parts[i];
+    if (!part) continue;
+    const shot = await prisma.shot.findUnique({ where: { id: shotId } });
+    if (!shot) continue;
+    const translations = { ...(shot.translations as Record<string, string>), [lang]: part };
+    await prisma.shot.update({ where: { id: shotId }, data: { translations } });
+  }
+  if (parts.length !== shotIds.length) {
+    console.warn(
+      `[job ${job.id}] 译文段数(${parts.length})与镜头数(${shotIds.length})不一致，已按序对齐可用部分`,
+    );
+  }
 }
 
 /** 分镜结果落库：集/场/镜 + 每镜默认环节配置 + 角色名对齐 */
