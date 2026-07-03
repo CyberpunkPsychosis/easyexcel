@@ -89,7 +89,7 @@ function CharacterCard({ projectId, character }: { projectId: string; character:
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-white">{character.name}</h3>
+            <h3 className="font-display font-semibold tracking-wide text-white">{character.name}</h3>
             <button
               className="text-[10px] text-slate-600 hover:text-red-400"
               onClick={() => {
@@ -176,7 +176,7 @@ export function CharactersView({ projectId }: { projectId: string }) {
         <Link href={`/projects/${projectId}`} className="btn-ghost text-xs">
           ← 工作台
         </Link>
-        <h1 className="text-lg font-semibold text-white">{project.name} · 角色库</h1>
+        <h1 className="display-title text-xl">{project.name} · 角色库</h1>
       </header>
 
       <section className="card mt-4 flex flex-wrap items-end gap-3 p-4">

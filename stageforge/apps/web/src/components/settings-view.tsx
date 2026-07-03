@@ -63,7 +63,7 @@ function MembersSection({ projectId, ownerId }: { projectId: string; ownerId: st
 
   return (
     <section className="card mt-4 p-4">
-      <h2 className="text-sm font-medium text-white">团队成员</h2>
+      <h2 className="font-display text-base font-semibold tracking-wide text-white">团队成员</h2>
       <ul className="mt-3 space-y-1.5 text-xs">
         <li className="flex items-center justify-between">
           <span className="text-slate-300">{data?.owner?.email}</span>
@@ -144,11 +144,11 @@ export function SettingsView({ projectId }: { projectId: string }) {
         <Link href={`/projects/${projectId}`} className="btn-ghost text-xs">
           ← 工作台
         </Link>
-        <h1 className="text-lg font-semibold text-white">{project.name} · 设置</h1>
+        <h1 className="display-title text-xl">{project.name} · 设置</h1>
       </header>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">备案信息</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">备案信息</h2>
         <p className="mt-1 text-xs text-slate-500">
           2026-04 起未备案 AI 短剧一律下架。备案号会随 AI 标识水印烧进成片角标，也是合规卡点的校验项。
         </p>
@@ -170,7 +170,7 @@ export function SettingsView({ projectId }: { projectId: string }) {
       </section>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">剧集合规卡点</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">剧集合规卡点</h2>
         <p className="mt-1 text-xs text-slate-500">
           合成/导出前强制检查：备案号、AI 标识水印、台词内容预审（LLM）。blocked 状态禁止出片。
         </p>

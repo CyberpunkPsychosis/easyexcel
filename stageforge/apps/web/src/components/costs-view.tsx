@@ -33,7 +33,7 @@ export function CostsView({ projectId }: { projectId: string }) {
         <Link href={`/projects/${projectId}`} className="btn-ghost text-xs">
           ← 工作台
         </Link>
-        <h1 className="text-lg font-semibold text-white">成本仪表盘</h1>
+        <h1 className="display-title text-xl">成本仪表盘</h1>
       </header>
 
       <section className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">

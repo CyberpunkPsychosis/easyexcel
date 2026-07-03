@@ -51,11 +51,11 @@ export function AnalyticsView({ projectId }: { projectId: string }) {
         <Link href={`/projects/${projectId}`} className="btn-ghost text-xs">
           ← 工作台
         </Link>
-        <h1 className="text-lg font-semibold text-white">数据分析</h1>
+        <h1 className="display-title text-xl">数据分析</h1>
       </header>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">各环节任务成功率</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">各环节任务成功率</h2>
         <div className="mt-3 space-y-2">
           {successRates.map((r) => (
             <div key={r.cap} className="grid grid-cols-[7rem_1fr_6rem] items-center gap-3 text-xs">
@@ -71,7 +71,7 @@ export function AnalyticsView({ projectId }: { projectId: string }) {
       </section>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">各环节平均耗时</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">各环节平均耗时</h2>
         <div className="mt-3 space-y-2">
           {data.avgDurationMs.map((r) => (
             <div key={r.capability} className="flex items-center justify-between text-xs">
@@ -86,7 +86,7 @@ export function AnalyticsView({ projectId }: { projectId: string }) {
       </section>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">
           重roll分布 <span className="text-[10px] text-slate-500">（行业参考：单次成功率不足 40%）</span>
         </h2>
         <div className="mt-3 space-y-2 text-xs">
@@ -108,7 +108,7 @@ export function AnalyticsView({ projectId }: { projectId: string }) {
       </section>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">成本日趋势（实际流水，含重roll）</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">成本日趋势（实际流水，含重roll）</h2>
         <div className="mt-3 space-y-2">
           {data.costByDay.map((d) => {
             const total = Object.values(d.currencies).reduce((a, b) => a + b, 0);
@@ -129,7 +129,7 @@ export function AnalyticsView({ projectId }: { projectId: string }) {
       </section>
 
       <section className="card mt-4 overflow-x-auto p-4">
-        <h2 className="text-sm font-medium text-white">模型用量占比（按花费）</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">模型用量占比（按花费）</h2>
         <table className="mt-2 w-full text-left text-xs">
           <tbody>
             {data.costByAdapter.map((r) => (

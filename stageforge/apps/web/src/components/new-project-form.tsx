@@ -63,7 +63,7 @@ export function NewProjectForm({
 
   return (
     <div className="card w-full max-w-2xl p-6">
-      <h2 className="text-lg font-semibold text-white">新建短剧项目</h2>
+      <h2 className="display-title text-xl">新建短剧项目</h2>
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <input
           className="input"

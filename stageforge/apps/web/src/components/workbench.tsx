@@ -125,11 +125,11 @@ function ShotEditor({ projectId, shot }: { projectId: string; shot: ApiShot }) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-xs text-slate-400">台词 / 旁白</label>
+        <label className="micro-label mb-1.5 block">台词 / 旁白</label>
         <textarea className="input h-16 resize-y" value={dialogue} onChange={(e) => setDialogue(e.target.value)} />
       </div>
       <div>
-        <label className="mb-1 block text-xs text-slate-400">画面提示词（visual prompt）</label>
+        <label className="micro-label mb-1.5 block">画面提示词 · Visual Prompt</label>
         <textarea
           className="input h-24 resize-y font-mono text-xs"
           value={visualPrompt}
@@ -230,9 +230,9 @@ function EpisodeTree({
       {episodes.map((ep) => (
         <div key={ep.id}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-white">
+            <span className="font-display text-sm font-semibold tracking-wide text-white">
               {ep.title}
-              {ep.musicAssetId && <span title="已有配乐，合成时自动混音"> ♪</span>}
+              {ep.musicAssetId && <span className="text-blue-400" title="已有配乐，合成时自动混音"> ♪</span>}
             </span>
             <div className="flex items-center gap-1">
               {ep.finalAssetId && (
@@ -320,12 +320,12 @@ function EpisodeTree({
           {batch.isError && <p className="text-[10px] text-red-400">{batch.error.message}</p>}
           {translate.isError && <p className="text-[10px] text-red-400">{translate.error.message}</p>}
           {ep.scenes.map((scene) => (
-            <div key={scene.id} className="mt-2">
-              <div className="text-xs text-slate-500">
+            <div key={scene.id} className="mt-3">
+              <div className="micro-label">
                 {scene.title}
                 {scene.location ? ` · ${scene.location}` : ''}
               </div>
-              <div className="mt-1 space-y-1">
+              <div className="mt-1.5 space-y-1">
                 {scene.shots.map((shot) => {
                   const hasVideo = shot.variants.some(
                     (v) => v.selected && v.capability.startsWith('video.') && v.asset.contentType.startsWith('video/'),
@@ -334,14 +334,16 @@ function EpisodeTree({
                     <button
                       key={shot.id}
                       onClick={() => onSelect(shot.id)}
-                      className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                      className={`block w-full rounded-lg border px-2 py-1.5 text-left text-xs transition-all duration-200 ${
                         selectedShotId === shot.id
-                          ? 'bg-blue-600/20 text-blue-200 ring-1 ring-blue-600'
-                          : 'text-slate-400 hover:bg-ink-800'
+                          ? 'border-blue-600/70 bg-blue-900/25 text-blue-200'
+                          : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-ink-850'
                       }`}
                     >
-                      <span className="mr-1 text-slate-600">#{shot.index + 1}</span>
-                      {shot.dialogue ? shot.dialogue.slice(0, 18) : shot.visualPrompt.slice(0, 18)}
+                      <span className="mr-1.5 font-mono text-[10px] text-slate-600">
+                        {String(shot.index + 1).padStart(2, '0')}
+                      </span>
+                      {shot.dialogue ? shot.dialogue.slice(0, 16) : shot.visualPrompt.slice(0, 16)}
                       {hasVideo && <span className="ml-1 text-emerald-400">●</span>}
                     </button>
                   );
@@ -393,11 +395,12 @@ export function Workbench({ projectId }: { projectId: string }) {
 
   return (
     <main className="flex h-screen flex-col">
-      <header className="flex items-center gap-4 border-b border-slate-800 px-4 py-2.5">
-        <Link href="/" className="text-sm font-bold text-white">
+      <header className="flex items-center gap-4 border-b border-slate-800/80 bg-ink-900/60 px-4 py-2.5 backdrop-blur">
+        <Link href="/" className="font-display text-base font-semibold tracking-wide text-white">
           Stage<span className="text-blue-400">Forge</span>
         </Link>
-        <span className="text-sm text-slate-300">{project.name}</span>
+        <span className="hidden h-4 w-px bg-slate-800 sm:block" />
+        <span className="font-display text-sm text-slate-300">{project.name}</span>
         <nav className="ml-4 flex gap-2 text-xs">
           <span className="badge bg-blue-900/50 text-blue-300">工作台</span>
           <Link className="badge bg-slate-800 text-slate-400 hover:text-white" href={`/projects/${projectId}/storyboard`}>
@@ -452,17 +455,32 @@ export function Workbench({ projectId }: { projectId: string }) {
         <section className="min-w-0 flex-1 overflow-y-auto p-4">
           {selectedShot ? (
             <div className="mx-auto max-w-3xl space-y-4">
+              {/* 监视器画框：letterbox + REC + 时间码 */}
               <div className="flex justify-center">
-                <div className="card flex aspect-[9/16] h-[420px] items-center justify-center overflow-hidden">
-                  {mainPreview ? (
-                    <VariantPreview variant={mainPreview} large />
-                  ) : (
-                    <div className="p-6 text-center text-xs text-slate-500">
-                      尚未生成
-                      <br />
-                      在右侧 Stage Rail 依次生成 关键帧 → 视频
-                    </div>
-                  )}
+                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-card">
+                  <div className="flex items-center justify-between gap-6 bg-ink-900/90 px-3 py-1.5">
+                    <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-widest text-red-400">
+                      <span className="h-1.5 w-1.5 animate-rec rounded-full bg-red-500" />
+                      {mainPreview ? 'PREVIEW' : 'STANDBY'}
+                    </span>
+                    <span className="timecode">
+                      SHOT {String(selectedShot.index + 1).padStart(2, '0')} ·{' '}
+                      {String(Math.floor(selectedShot.durationSec)).padStart(2, '0')}s · 9:16
+                    </span>
+                  </div>
+                  <div className="flex aspect-[9/16] h-[400px] items-center justify-center bg-ink-950">
+                    {mainPreview ? (
+                      <VariantPreview variant={mainPreview} large />
+                    ) : (
+                      <div className="p-6 text-center text-xs leading-6 text-slate-600">
+                        <p className="font-display text-lg text-slate-500">待机</p>
+                        在右侧 Stage Rail 依次生成
+                        <br />
+                        关键帧 → 视频
+                      </div>
+                    )}
+                  </div>
+                  <div className="sprockets bg-ink-900/90" />
                 </div>
               </div>
               <ShotEditor projectId={projectId} shot={selectedShot} />
@@ -480,8 +498,8 @@ export function Workbench({ projectId }: { projectId: string }) {
 
         {/* 右：Stage Rail —— 每个环节一个模型下拉，任意切换 */}
         <aside className="w-80 shrink-0 overflow-y-auto border-l border-slate-800 p-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Stage Rail · 环节 × 模型
+          <h3 className="micro-label mb-3">
+            Stage Rail <span className="text-blue-500">·</span> 环节 × 模型
           </h3>
           {selectedShot && (
             <StageRail

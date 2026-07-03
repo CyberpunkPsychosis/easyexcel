@@ -2,16 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Cinema Noir 暗房调色台 ─────────────────────────────────
+   近黑暖炭底 + 香槟金 + 暖纸白；胶片颗粒与暗角常驻；
+   衬线标题 / 等宽时间码 / 大字距微标签是三件套。 */
+
 :root {
   color-scheme: dark;
 }
 
 body {
-  @apply bg-ink-950 text-slate-200 antialiased;
+  @apply bg-ink-950 text-slate-300 antialiased;
   background-image:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(56, 89, 199, 0.18), transparent),
-    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(168, 85, 247, 0.10), transparent);
+    radial-gradient(ellipse 90% 55% at 50% -12%, rgba(207, 154, 66, 0.10), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 90% 105%, rgba(117, 152, 95, 0.05), transparent),
+    linear-gradient(#0d0c0a, #0d0c0a);
   min-height: 100vh;
+  position: relative;
+}
+
+/* 胶片颗粒（SVG feTurbulence，自包含无外链） */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* 暗角 */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 49;
+  background: radial-gradient(ellipse 120% 90% at 50% 40%, transparent 62%, rgba(0, 0, 0, 0.5));
+}
+
+::selection {
+  background: rgba(207, 154, 66, 0.35);
+  color: #f6f1e7;
 }
 
 ::-webkit-scrollbar {
@@ -21,27 +53,87 @@ body {
 ::-webkit-scrollbar-thumb {
   @apply rounded bg-slate-700;
 }
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
+}
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-800 bg-ink-900/80 shadow-lg shadow-black/20;
+    @apply rounded-2xl border border-slate-800 shadow-card;
+    background: linear-gradient(165deg, #1a1814 0%, #141310 55%, #12110e 100%);
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
   }
+  .card-hover {
+    @apply hover:-translate-y-0.5 hover:border-blue-700;
+  }
+
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-blue-600 text-white hover:bg-blue-500;
+    @apply btn text-ink-950;
+    background: linear-gradient(160deg, #e7c887, #cf9a42 60%, #b07c2e);
+    box-shadow: 0 2px 14px rgba(207, 154, 66, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    box-shadow: 0 4px 20px rgba(207, 154, 66, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: scale(0.98);
   }
   .btn-ghost {
-    @apply btn border border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white;
+    @apply btn border border-slate-700 bg-transparent text-slate-300 hover:border-blue-500 hover:text-blue-300;
   }
+
   .input {
-    @apply w-full rounded-lg border border-slate-700 bg-ink-950/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none;
+    @apply w-full rounded-xl border border-slate-800 bg-ink-950/80 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 transition-colors;
   }
+  .input:focus {
+    @apply border-blue-500 outline-none;
+    box-shadow: 0 0 0 3px rgba(207, 154, 66, 0.15);
+  }
+
   .badge {
-    @apply inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium leading-none;
+    @apply inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none tracking-wider;
+  }
+
+  /* 微标签：大字距全大写小字 —— 片场标牌 */
+  .micro-label {
+    @apply text-[10px] font-medium uppercase tracking-[0.22em] text-slate-500;
+  }
+
+  /* 时间码：等宽金字 */
+  .timecode {
+    @apply font-mono text-[11px] tracking-widest text-blue-400;
+  }
+
+  /* 衬线大标题 */
+  .display-title {
+    @apply font-display font-semibold tracking-wide text-white;
+  }
+
+  /* 金色分隔线（短横） */
+  .rule-gold {
+    @apply inline-block h-px w-10 align-middle;
+    background: linear-gradient(90deg, #cf9a42, transparent);
+  }
+
+  /* 胶片齿孔条 */
+  .sprockets {
+    height: 14px;
+    background-image: radial-gradient(rgba(246, 241, 231, 0.16) 2.5px, transparent 3px);
+    background-size: 22px 14px;
+    background-position: 6px center;
+    background-repeat: repeat-x;
+  }
+
+  .skeleton {
+    @apply animate-shimmer rounded-lg;
+    background: linear-gradient(90deg, #1a1814 25%, #242118 37%, #1a1814 63%);
+    background-size: 400px 100%;
   }
 }

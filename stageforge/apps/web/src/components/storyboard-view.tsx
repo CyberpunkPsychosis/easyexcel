@@ -94,11 +94,11 @@ export function StoryboardView({ projectId }: { projectId: string }) {
         <Link href={`/projects/${projectId}`} className="btn-ghost text-xs">
           ← 工作台
         </Link>
-        <h1 className="text-lg font-semibold text-white">{project.name} · 分镜表</h1>
+        <h1 className="display-title text-xl">{project.name} · 分镜表</h1>
       </header>
 
       <section className="card mt-4 p-4">
-        <h2 className="text-sm font-medium text-white">粘贴剧本 → 生成分镜（追加到现有集后）</h2>
+        <h2 className="font-display text-base font-semibold tracking-wide text-white">粘贴剧本 → 生成分镜（追加到现有集后）</h2>
         <textarea
           className="input mt-2 h-28 font-mono text-xs"
           placeholder="粘贴剧本，≤10 万字…"
