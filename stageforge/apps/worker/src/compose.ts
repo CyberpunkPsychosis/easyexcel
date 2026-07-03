@@ -89,7 +89,13 @@ export async function processCompose(jobId: string): Promise<void> {
         kind: 'final',
         storageKey: '',
         contentType: 'video/mp4',
-        meta: { episodeId: episode.id, segments: segments.length, skippedShots: skipped },
+        meta: {
+          episodeId: episode.id,
+          lang: lang ?? '',
+          segments: segments.length,
+          skippedShots: skipped,
+          hasMusic: Boolean(musicPath),
+        },
       },
     });
     const key = `${job.projectId}/${asset.id}.mp4`;

@@ -85,6 +85,8 @@ export interface CharacterRef {
   refAssetId?: string | null;
   /** 固定一致性话术，注入支持参考图的适配器 */
   consistencyNote: string;
+  /** 克隆音色 id（有则 TTS 用该角色专属音色） */
+  voiceId?: string | null;
 }
 
 export interface RunContext {

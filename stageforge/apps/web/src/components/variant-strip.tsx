@@ -46,18 +46,33 @@ export function VariantStrip({
         {CAPABILITY_LABEL[capability] ?? capability} · {list.length} 个变体（重roll累计计费）
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {list.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => select.mutate(v.id)}
-            title={v.selected ? '已选定（用于成片）' : '点击选定此变体'}
-            className={`shrink-0 overflow-hidden rounded-lg border-2 transition ${
-              v.selected ? 'border-blue-500 shadow shadow-blue-500/30' : 'border-slate-700 hover:border-slate-500'
-            }`}
-          >
-            <VariantPreview variant={v} />
-          </button>
-        ))}
+        {list.map((v) => {
+          const consistency = v.asset.meta?.consistency;
+          return (
+            <button
+              key={v.id}
+              onClick={() => select.mutate(v.id)}
+              title={
+                (v.selected ? '已选定（用于成片）' : '点击选定此变体') +
+                (consistency ? `\n一致性 ${consistency.score}分：${consistency.notes}` : '')
+              }
+              className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                v.selected ? 'border-blue-500 shadow shadow-blue-500/30' : 'border-slate-700 hover:border-slate-500'
+              }`}
+            >
+              <VariantPreview variant={v} />
+              {consistency && (
+                <span
+                  className={`absolute bottom-0.5 right-0.5 rounded px-1 text-[9px] font-bold ${
+                    consistency.score >= 80 ? 'bg-emerald-600/90 text-white' : 'bg-red-600/90 text-white'
+                  }`}
+                >
+                  {consistency.score}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

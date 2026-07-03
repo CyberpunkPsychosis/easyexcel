@@ -13,10 +13,52 @@ import {
   formatCents,
   type ApiAdapter,
   type ApiEpisode,
+  type ApiExport,
   type ApiJob,
   type ApiProject,
   type ApiShot,
 } from '@/lib/types';
+
+const LANG_LABEL = new Map(TARGET_LANGS);
+
+/** 一致性检测（M3）：选中关键帧 vs 角色定妆参考图，Claude 视觉裁判打分 */
+function ConsistencyChecker({ projectId, shot }: { projectId: string; shot: ApiShot }) {
+  const queryClient = useQueryClient();
+  const selectedImage = shot.variants.find((v) => v.selected && v.capability === 'image.t2i');
+  const check = useMutation({
+    mutationFn: () =>
+      api<{ result: { score: number; notes: string; mock: boolean }; characterName: string }>(
+        `/api/variants/${selectedImage!.id}/consistency`,
+        { method: 'POST' },
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
+  });
+  if (!selectedImage || shot.characterIds.length === 0) return null;
+  const stored = selectedImage.asset.meta?.consistency;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <button
+        className="btn-ghost text-xs"
+        disabled={check.isPending}
+        onClick={() => check.mutate()}
+        title="对比选中关键帧与角色定妆参考图（脸/发型/服装），低分变体建议重roll或换模型"
+      >
+        {check.isPending ? '检测中…' : '一致性检测'}
+      </button>
+      {(check.data?.result ?? stored) && (
+        <span className="text-slate-400">
+          {check.data?.characterName ?? stored?.characterName}：
+          <b className={(check.data?.result.score ?? stored!.score) >= 80 ? 'text-emerald-400' : 'text-red-400'}>
+            {check.data?.result.score ?? stored!.score} 分
+          </b>
+          {' · '}
+          {check.data?.result.notes ?? stored!.notes}
+        </span>
+      )}
+      {check.isError && <span className="text-red-400">{check.error.message}</span>}
+    </div>
+  );
+}
 
 function useProject(projectId: string) {
   return useQuery({
@@ -123,11 +165,13 @@ function ShotEditor({ projectId, shot }: { projectId: string; shot: ApiShot }) {
 function EpisodeTree({
   projectId,
   episodes,
+  exports,
   selectedShotId,
   onSelect,
 }: {
   projectId: string;
   episodes: ApiEpisode[];
+  exports: ApiExport[];
   selectedShotId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -162,6 +206,11 @@ function EpisodeTree({
         method: 'POST',
         body: JSON.stringify({ targetLang: p.targetLang }),
       }),
+    onSuccess: invalidateJobs,
+  });
+  // 多语批量导出：原文 + 所有已译语种，各出一个成片
+  const exportAll = useMutation({
+    mutationFn: (episodeId: string) => api(`/api/episodes/${episodeId}/export-all`, { method: 'POST' }),
     onSuccess: invalidateJobs,
   });
 
@@ -238,7 +287,35 @@ function EpisodeTree({
                 译{TARGET_LANGS.find(([c]) => c === lang)?.[1]}
               </button>
             )}
+            <button
+              className="btn-ghost px-2 py-0.5 text-[10px]"
+              disabled={exportAll.isPending}
+              onClick={() => exportAll.mutate(ep.id)}
+              title="原文 + 所有已译语种各出一个成片（一套素材出海多国）"
+            >
+              全语种导出
+            </button>
           </div>
+          {(() => {
+            const finals = exports.filter((x) => x.episodeId === ep.id);
+            if (finals.length === 0) return null;
+            return (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {finals.slice(0, 8).map((x) => (
+                  <a
+                    key={x.assetId}
+                    className="badge bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/70"
+                    href={`/api/assets/${x.assetId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`成片 · ${x.lang ? LANG_LABEL.get(x.lang) ?? x.lang : '原文'}${x.hasMusic ? ' · 含BGM' : ''}`}
+                  >
+                    ▶ {x.lang ? (LANG_LABEL.get(x.lang) ?? x.lang) : '原文'}
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
           {compose.isError && <p className="text-[10px] text-red-400">{compose.error.message}</p>}
           {batch.isError && <p className="text-[10px] text-red-400">{batch.error.message}</p>}
           {translate.isError && <p className="text-[10px] text-red-400">{translate.error.message}</p>}
@@ -282,6 +359,11 @@ export function Workbench({ projectId }: { projectId: string }) {
   const { data: projectData, isLoading } = useProject(projectId);
   const { data: registryData } = useRegistry();
   const { data: jobsData } = useJobs(projectId);
+  const { data: exportsData } = useQuery({
+    queryKey: ['exports', projectId],
+    queryFn: () => api<{ exports: ApiExport[] }>(`/api/projects/${projectId}/exports`),
+    refetchInterval: 5000,
+  });
   const { selectedShotId, setSelectedShot } = useWorkbenchStore();
 
   const project = projectData?.project;
@@ -349,6 +431,7 @@ export function Workbench({ projectId }: { projectId: string }) {
           <EpisodeTree
             projectId={projectId}
             episodes={project.episodes}
+            exports={exportsData?.exports ?? []}
             selectedShotId={selectedShot?.id ?? null}
             onSelect={setSelectedShot}
           />
@@ -377,6 +460,7 @@ export function Workbench({ projectId }: { projectId: string }) {
                 </div>
               </div>
               <ShotEditor projectId={projectId} shot={selectedShot} />
+              <ConsistencyChecker projectId={projectId} shot={selectedShot} />
               <div className="space-y-3">
                 {['image.t2i', 'video.i2v', 'video.t2v', 'audio.tts', 'audio.lipsync'].map((cap) => (
                   <VariantStrip key={cap} projectId={projectId} capability={cap} variants={selectedShot.variants} />

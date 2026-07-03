@@ -48,6 +48,7 @@ async function characterRefsFor(shot: Shot): Promise<CharacterRef[]> {
     name: c.name,
     refAssetId: c.refAssetId,
     consistencyNote: c.consistencyNote,
+    voiceId: c.voiceId,
   }));
 }
 
@@ -93,7 +94,9 @@ export async function buildStageInput(
     }
     case 'audio.tts': {
       if (!shot.dialogue.trim()) badRequest('该镜头没有台词，无法配音');
-      const input: TTSInput = { text: shot.dialogue };
+      // 声音克隆建库（M3）：镜头首个绑定了克隆音色的角色 → 用其专属 voiceId
+      const voiceId = refs.find((r) => r.voiceId)?.voiceId ?? undefined;
+      const input: TTSInput = { text: shot.dialogue, voiceId };
       return input as unknown as Prisma.InputJsonValue;
     }
     case 'audio.lipsync': {

@@ -111,6 +111,9 @@ model Character {
   consistencyNote String  @default("同一角色，服装一致，发型不变，保持人物样貌与服装一致")
   /// per-model 一致性资产（LoRA 权重 id / 参考图 hash 等），keyed by adapterId
   modelAssets     Json    @default("{}")
+  /// 克隆音色 id（ElevenLabs voice_id / mock:xxx）。TTS 时该角色台词自动用此音色
+  voiceId            String?
+  voiceSampleAssetId String?
 }
 
 /// 统一资产表（image/video/audio/final）

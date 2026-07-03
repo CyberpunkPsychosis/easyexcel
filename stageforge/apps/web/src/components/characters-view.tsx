@@ -38,20 +38,42 @@ function CharacterCard({ projectId, character }: { projectId: string; character:
     onSuccess: invalidate,
   });
 
-  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const dataUrl = await new Promise<string>((resolve, reject) => {
+  async function readAsDataUrl(file: File): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await readAsDataUrl(file);
     await api(`/api/characters/${character.id}/ref-image`, {
       method: 'POST',
       body: JSON.stringify({ mode: 'upload', dataUrl }),
     });
     invalidate();
+  }
+
+  const [voiceMsg, setVoiceMsg] = useState<string | null>(null);
+  async function onVoiceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVoiceMsg('克隆中…');
+    try {
+      const dataUrl = await readAsDataUrl(file);
+      const r = await api<{ voiceId: string; mock: boolean }>(`/api/characters/${character.id}/voice`, {
+        method: 'POST',
+        body: JSON.stringify({ dataUrl }),
+      });
+      setVoiceMsg(r.mock ? '已建 mock 音色（填 ELEVENLABS_API_KEY 启用真实克隆）' : '克隆完成，该角色台词将使用专属音色');
+      invalidate();
+    } catch (err) {
+      setVoiceMsg(err instanceof Error ? err.message : String(err));
+    }
   }
 
   return (
@@ -100,7 +122,20 @@ function CharacterCard({ projectId, character }: { projectId: string; character:
               上传定妆照
               <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
             </label>
+            <label
+              className="btn-ghost cursor-pointer text-xs"
+              title="上传约 1 分钟高质量样音，克隆该角色专属音色（此后台词 TTS 自动使用）"
+            >
+              {character.voiceId ? '重克隆声音' : '克隆声音'}
+              <input type="file" accept="audio/*" className="hidden" onChange={onVoiceUpload} />
+            </label>
+            {character.voiceId && (
+              <span className="badge bg-emerald-900/60 text-emerald-300" title={character.voiceId}>
+                ♪ 专属音色
+              </span>
+            )}
           </div>
+          {voiceMsg && <p className="mt-1 text-xs text-slate-400">{voiceMsg}</p>}
           {generateRef.isError && <p className="mt-1 text-xs text-red-400">{generateRef.error.message}</p>}
         </div>
       </div>

@@ -56,6 +56,18 @@ export interface ApiAsset {
   id: string;
   kind: string;
   contentType: string;
+  meta?: {
+    consistency?: { score: number; notes: string; mock: boolean; characterName?: string };
+    [k: string]: unknown;
+  };
+}
+
+export interface ApiExport {
+  assetId: string;
+  episodeId: string | null;
+  lang: string;
+  hasMusic: boolean;
+  createdAt: string;
 }
 
 export interface ApiVariant {
@@ -124,6 +136,7 @@ export interface ApiCharacter {
   name: string;
   description: string;
   refAssetId: string | null;
+  voiceId: string | null;
 }
 
 export interface ApiModelConfig {

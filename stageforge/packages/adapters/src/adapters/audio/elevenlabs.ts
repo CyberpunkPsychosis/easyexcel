@@ -83,7 +83,37 @@ export const elevenlabsTts: ModelAdapter<TTSInput, AssetOutput> = {
   },
 };
 
-/** 声音克隆：真实实现需先上传样音建 voice（M3 计划）；当前 mock 占位 */
+/**
+ * 声音克隆建库（M3）：上传样音 → ElevenLabs Instant Voice Cloning，返回 voice_id。
+ * 调研核验：1 分钟高质量样音即可克隆自然人声。无 key 时返回 mock voiceId（TTS mock 路径照常工作）。
+ */
+export async function cloneVoiceElevenLabs(
+  name: string,
+  sample: { data: Buffer; contentType: string },
+): Promise<{ voiceId: string; mock: boolean }> {
+  if (!elevenKey()) {
+    return { voiceId: `mock-voice-${name}-${sample.data.length % 997}`, mock: true };
+  }
+  const form = new FormData();
+  form.append('name', name);
+  form.append(
+    'files',
+    new Blob([new Uint8Array(sample.data)], { type: sample.contentType }),
+    `sample.${sample.contentType.includes('wav') ? 'wav' : 'mp3'}`,
+  );
+  const res = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+    method: 'POST',
+    headers: { 'xi-api-key': elevenKey()! },
+    body: form,
+  });
+  const json = (await res.json().catch(() => ({}))) as { voice_id?: string; detail?: unknown };
+  if (!res.ok || !json.voice_id) {
+    throw new Error(`ElevenLabs 克隆失败 ${res.status}: ${JSON.stringify(json.detail ?? json).slice(0, 300)}`);
+  }
+  return { voiceId: json.voice_id, mock: false };
+}
+
+/** 声音克隆（TTS 侧展示位）：克隆建库走 cloneVoiceElevenLabs；此适配器供注册表/UI 显示 */
 export const elevenlabsClone = defineMockTtsAdapter({
   id: 'elevenlabs-clone',
   capability: 'audio.voiceclone',
